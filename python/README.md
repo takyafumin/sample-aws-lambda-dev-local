@@ -2,16 +2,26 @@
 
 AWS Lambdaのローカル開発環境サンプルプロジェクト
 
-## 環境セットアップ
+## 前提条件
+
+### 必要なツール
+
+| ツール | バージョン |
+|--------|-----------|
+| Homebrew | - |
+| Python | 3.13 |
+| uv | latest |
+| Docker | latest |
+| AWS CLI | latest |
+
+## セットアップ手順
 
 ```bash
-# 自動セットアップ（推奨）
-./scripts/setup-macos.sh
-aws configure
-
-# または手動セットアップ
-brew install uv awscli docker
+# 1. 依存関係のインストール
 uv sync
+
+# 2. AWS認証情報の設定
+aws configure
 ```
 
 ## 開発ワークフロー
@@ -31,12 +41,6 @@ uv run pytest tests/
 ```bash
 # Dockerでテスト実行
 ./scripts/test-local.sh
-
-# 手動でDockerテスト
-docker build -t aws-lambda-python-sample -f docker/Dockerfile .
-docker run --rm -d -p 9000:8080 aws-lambda-python-sample
-curl -XPOST "http://localhost:9000/2015-03-31/functions/function/invocations" \
-     -d '{"Records": [{"body": "test"}]}'
 ```
 
 ### 3. AWSデプロイ
@@ -51,10 +55,6 @@ curl -XPOST "http://localhost:9000/2015-03-31/functions/function/invocations" \
 ```bash
 # デプロイされたLambda関数をテスト
 ./scripts/test-remote.sh
-
-# 手動でAWSテスト
-aws lambda invoke --function-name aws-sample-lambda response.json
-cat response.json
 ```
 
 ## プロジェクト構成
@@ -64,7 +64,6 @@ cat response.json
 ├── tests/test_lambda_handler.py      # テストファイル
 ├── docker/Dockerfile                 # Lambda用Dockerファイル
 ├── scripts/                          # 自動化スクリプト
-│   ├── setup-macos.sh               # 環境セットアップ
 │   ├── test-local.sh                # Dockerローカルテスト
 │   ├── deploy.sh                    # AWSデプロイ
 │   └── test-remote.sh               # AWSリモートテスト
