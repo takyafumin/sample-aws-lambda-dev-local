@@ -1,0 +1,6 @@
+{
+    "test_mode": "remote",
+    "message": "Hello from remote Lambda test",
+    "environment": "production",
+    "timestamp": "2026-01-02T00:00:00Z"
+}

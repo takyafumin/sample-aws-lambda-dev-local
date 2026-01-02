@@ -1,0 +1,20 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+  "python.terminal.activateEnvironment": true,
+  // フォーマッター（blackを使う場合）
+  "[python]": {
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "ms-python.black-formatter"
+  },
+  // テスト
+  "python.testing.pytestEnabled": true,
+  "python.testing.unittestEnabled": false,
+  // その他
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/.pytest_cache": true
+  },
+  "python.analysis.extraPaths": [
+    "./src"
+  ]
+}
