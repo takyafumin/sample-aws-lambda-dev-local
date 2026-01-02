@@ -22,12 +22,32 @@ AWS LambdaのPython環境でのローカル開発環境を検証するための�
     ```bash
     uv sync
     ```
+
 3. 環境変数を設定します。`.env.sample`を参考に`.env`ファイルを作成し、AWSのアクセスキー、シークレットキー、バケット名を設定してください。
 
-4. `main.py`の`lambda_handler`関数をローカルで実行して動作を確認します。
+## 実行方法
+
+### ローカルCLI実行
+
+1. `main.py`の`lambda_handler`関数をローカルで実行して動作を確認します。
 
     ```bash
     uv run main.py
+    ```
+
+### Lambdaエミュレーション実行
+
+1. Dockerを使用してLambda環境をエミュレートし、関数を実行します。
+
+    ```bash
+    docker build -t lambda-python-sample .
+    docker run --rm -p 9000:8080 lambda-python-sample
+    ```
+
+2. curlコマンドでエミュレートされたLambda関数を呼び出します。
+
+    ```bash
+    curl -XPOST "http://localhost:9000/2015-03-31/functions/function/invocations" -d '{}'
     ```
 
 ## 参考

@@ -59,5 +59,5 @@ def lambda_handler(event, context):
 
 
 if __name__ == "__main__":
-    event = {...}
+    event = {}
     lambda_handler(event, None)
