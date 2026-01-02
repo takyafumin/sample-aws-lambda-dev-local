@@ -14,12 +14,14 @@ def getBucketObjectNames():
         array: バケットオブジェクト名の配列
     """
     try:
-        access_key = os.getenv("ACCESS_KEY")
-        secret_key = os.getenv("SECRET_KEY")
-        bucket_name = os.getenv("BUCKET_NAME")
+        access_key = os.getenv("AWS_ACCESS_KEY_ID")
+        secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
+        bucket_name = os.getenv("AWS_BUCKET_NAME")
 
         if not access_key or not secret_key or not bucket_name:
-            print("Error: Missing required environment variables")
+            print(
+                "Error: Missing required environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_BUCKET_NAME)"
+            )
             return []
 
         s3 = boto3.resource(

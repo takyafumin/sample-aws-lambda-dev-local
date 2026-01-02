@@ -50,15 +50,86 @@ if [[ ! -f "$TEST_EVENT" ]]; then
 EOF
 fi
 
+# 環境変数の確認と設定
+echo "🔍 必要な環境変数の確認中..."
+
+# .envファイルが存在する場合は読み込み
+ENV_FILE=".env"
+if [[ -f "$ENV_FILE" ]]; then
+    echo "📋 .envファイルから環境変数を読み込んでいます..."
+    set -a  # 自動的にエクスポート
+    source "$ENV_FILE"
+    set +a
+    echo "✅ .envファイルから環境変数を読み込みました"
+else
+    echo "⚠️ .envファイルが見つかりません"
+fi
+
+# AWS Default Regionの設定
+if [[ -z "$AWS_DEFAULT_REGION" ]]; then
+    export AWS_DEFAULT_REGION="ap-northeast-1"
+fi
+
+# Lambda関数で必要なAWS標準環境変数の確認
+REQUIRED_VARS=("AWS_ACCESS_KEY_ID" "AWS_SECRET_ACCESS_KEY" "AWS_BUCKET_NAME")
+MISSING_VARS=()
+
+for var in "${REQUIRED_VARS[@]}"; do
+    if [[ -z "${!var}" ]]; then
+        MISSING_VARS+=("$var")
+    fi
+done
+
+if [[ ${#MISSING_VARS[@]} -gt 0 ]]; then
+    echo "⚠️ 以下のAWS標準環境変数が設定されていません:"
+    for var in "${MISSING_VARS[@]}"; do
+        echo "   - $var"
+    done
+    echo ""
+    echo "💡 以下のいずれかの方法で環境変数を設定してください:"
+    echo "   1. .envファイルを作成してください:"
+    echo "      AWS_ACCESS_KEY_ID=your_access_key"
+    echo "      AWS_SECRET_ACCESS_KEY=your_secret_key"
+    echo "      AWS_BUCKET_NAME=your_bucket_name"
+    echo ""
+    echo "   2. 環境変数として設定してください:"
+    echo "      export AWS_ACCESS_KEY_ID=your_access_key"
+    echo "      export AWS_SECRET_ACCESS_KEY=your_secret_key"
+    echo "      export AWS_BUCKET_NAME=your_bucket_name"
+    echo ""
+    echo "🤔 環境変数なしでテストを続行しますか？ (y/N)"
+    read -r response
+    if [[ ! "$response" =~ ^[Yy]$ ]]; then
+        echo "⏭️ テストを中止しました"
+        exit 1
+    fi
+    echo "⚠️ 環境変数なしでテストを続行します（S3機能は動作しません）"
+else
+    echo "✅ 必要なAWS標準環境変数が設定されています"
+fi
+
 # Dockerコンテナでテスト実行
 echo "🚀 AWS Lambda Runtime Interface Emulatorでテストを実行しています..."
 
+# AWS標準環境変数のリスト（存在する場合のみ設定）
+ENV_ARGS=()
+AWS_ENV_VARS=(
+    "AWS_ACCESS_KEY_ID"
+    "AWS_SECRET_ACCESS_KEY"
+    "AWS_DEFAULT_REGION"
+    "AWS_SESSION_TOKEN"
+    "AWS_BUCKET_NAME"
+)
+
+for var in "${AWS_ENV_VARS[@]}"; do
+    if [[ -n "${!var}" ]]; then
+        ENV_ARGS+=("-e" "$var=${!var}")
+    fi
+done
+
 # バックグラウンドでLambda Emulatorを起動
 docker run --rm -d -p 9000:8080 \
-    -e AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}" \
-    -e AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" \
-    -e AWS_SESSION_TOKEN="${AWS_SESSION_TOKEN}" \
-    -e AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-ap-northeast-1}" \
+    "${ENV_ARGS[@]}" \
     --name lambda-test-$$ \
     ${DOCKER_IMAGE_NAME}:latest
 
