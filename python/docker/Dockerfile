@@ -10,12 +10,12 @@ ENV PYTHONPATH=${LAMBDA_TASK_ROOT}/src:${LAMBDA_TASK_ROOT}:${LAMBDA_TASK_ROOT}/.
 
 # アプリケーションの依存関係をインストール 
 WORKDIR ${LAMBDA_TASK_ROOT}
-COPY uv.lock pyproject.toml ./
+COPY ../uv.lock ../pyproject.toml ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev
 
-COPY main.py ${LAMBDA_TASK_ROOT}
+COPY ../src/handlers/lambda_handler.py ${LAMBDA_TASK_ROOT}/src/handlers/
 # FIXME: .envファイルで認証情報をコンテナにセットするのはよくない
 COPY .env ${LAMBDA_TASK_ROOT}
 
-CMD ["main.lambda_handler"]
+CMD ["src.handlers.lambda_handler.lambda_handler"]

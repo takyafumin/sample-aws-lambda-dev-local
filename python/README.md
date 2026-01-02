@@ -1,55 +1,83 @@
-# lambda(python)のローカル開発環境検証サンプル
+# AWS Lambda Python Sample
 
-## 概要
+AWS Lambdaのローカル開発環境サンプルプロジェクト
 
-AWS LambdaのPython環境でのローカル開発環境を検証するためのサンプルプロジェクトです。
+## プロジェクト構成
 
-## 環境
+```
+├── src/
+│   └── handlers/
+│       ├── __init__.py
+│       └── lambda_handler.py      # Lambda関数のメインハンドラ
+├── tests/
+│   └── test_lambda_handler.py     # テストファイル
+├── docs/
+│   └── README.md                  # 詳細ドキュメント
+├── docker/
+│   └── Dockerfile                 # Lambda用Dockerファイル
+├── config/
+│   └── .env.sample               # 環境変数のサンプル
+├── scripts/
+│   └── deploy.sh                 # デプロイスクリプト
+├── .env                          # 環境変数（gitignore対象）
+├── pyproject.toml                # プロジェクト設定
+└── uv.lock                       # 依存関係ロックファイル
+```
 
-- Python 3.13
-- boto3
+## 環境設定
 
-## 使い方
+1. 環境変数ファイルを設定：
+   ```bash
+   cp config/.env.sample .env
+   # .envファイルに実際の値を設定
+   ```
 
-1. リポジトリをクローンします。
+2. Python環境のセットアップ：
+   ```bash
+   uv sync
+   ```
 
-    ```bash
-    git clone <repository_url>
-    cd aws-sample-lambda-dev-local/python
-    ```
-2. 必要なパッケージをインストールします。
+## ローカル開発
 
-    ```bash
-    uv sync
-    ```
+### テスト実行
+```bash
+uv run pytest tests/
+```
 
-3. 環境変数を設定します。`.env.sample`を参考に`.env`ファイルを作成し、AWSのアクセスキー、シークレットキー、バケット名を設定してください。
+### Lambda関数の実行
+```bash
+uv run python src/handlers/lambda_handler.py
+```
 
-## 実行方法
+## Dockerでの実行
 
-### ローカルCLI実行
+### イメージのビルド
+```bash
+docker build -t aws-lambda-python-sample -f docker/Dockerfile .
+```
 
-1. `main.py`の`lambda_handler`関数をローカルで実行して動作を確認します。
+### コンテナの実行
+```bash
+docker run -p 9000:8080 --env-file .env aws-lambda-python-sample
+```
 
-    ```bash
-    uv run main.py
-    ```
+### Lambda関数の呼び出し
+```bash
+curl -XPOST "http://localhost:9000/2015-03-31/functions/function/invocations" -d '{}'
+```
 
-### Lambdaエミュレーション実行
+## デプロイ
 
-1. Dockerを使用してLambda環境をエミュレートし、関数を実行します。
+```bash
+./scripts/deploy.sh
+```
 
-    ```bash
-    docker build -t lambda-python-sample .
-    docker run --rm -p 9000:8080 lambda-python-sample
-    ```
+## 機能概要
 
-2. curlコマンドでエミュレートされたLambda関数を呼び出します。
+このサンプルプロジェクトは、S3バケット内のオブジェクト一覧を取得するLambda関数です。
 
-    ```bash
-    curl -XPOST "http://localhost:9000/2015-03-31/functions/function/invocations" -d '{}'
-    ```
-
-## 参考
-
-- [Python開発環境をVSCode + uvで整える](https://qiita.com/ebimontblanc/items/8a0a52b10a82ba800ea5)
+### 主な機能
+- S3バケット内のオブジェクト名取得
+- 環境変数による設定管理
+- エラーハンドリング
+- Dockerコンテナでの実行サポート
