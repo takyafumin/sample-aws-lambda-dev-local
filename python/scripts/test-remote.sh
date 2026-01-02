@@ -64,6 +64,9 @@ if [[ -f "$OUTPUT_FILE" ]]; then
     cat "$OUTPUT_FILE" | python3 -m json.tool 2>/dev/null || cat "$OUTPUT_FILE"
     echo ""
     echo "✅ Lambda関数のテストが完了しました！"
+    
+    # response.jsonファイルを削除
+    rm -f "$OUTPUT_FILE"
 else
     echo "❌ レスポンスファイルが作成されませんでした"
     exit 1
@@ -71,13 +74,32 @@ fi
 
 # ログの確認
 echo ""
-echo "📊 最新のログを確認しますか？ (y/N)"
-read -r response
-if [[ "$response" =~ ^[Yy]$ ]]; then
-    echo "📜 CloudWatch Logsを確認しています..."
-    LOG_GROUP="/aws/lambda/$FUNCTION_NAME"
+echo "📜 最新のログを確認しています..."
+LOG_GROUP="/aws/lambda/$FUNCTION_NAME"
+
+# 最新のログストリームを取得
+LATEST_STREAM=$(aws logs describe-log-streams \
+    --log-group-name "$LOG_GROUP" \
+    --region $REGION \
+    --order-by LastEventTime \
+    --descending \
+    --max-items 1 \
+    --query 'logStreams[0].logStreamName' \
+    --output text 2>/dev/null)
+
+if [[ "$LATEST_STREAM" != "None" && -n "$LATEST_STREAM" && "$LATEST_STREAM" != "null" ]]; then
+    echo "📋 最新のログストリーム: $LATEST_STREAM"
+    # CloudWatch Logsコンソールへのリンクを生成
+    LOG_STREAM_ENCODED=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$LATEST_STREAM', safe=''))" 2>/dev/null || echo "$LATEST_STREAM")
+    LOG_GROUP_ENCODED=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$LOG_GROUP', safe=''))" 2>/dev/null || echo "$LOG_GROUP")
+    CONSOLE_URL="https://${REGION}.console.aws.amazon.com/cloudwatch/home?region=${REGION}#logsV2:log-groups/log-group/${LOG_GROUP_ENCODED}/log-events/${LOG_STREAM_ENCODED}"
+    echo "🔗 CloudWatch Logsで確認: $CONSOLE_URL"
+else
+    echo "⚠️ ログストリームが見つかりませんでした"
+    # 少し待機してから再試行
+    echo "   ⏳ ログの反映を待機しています..."
+    sleep 5
     
-    # 最新のログストリームを取得
     LATEST_STREAM=$(aws logs describe-log-streams \
         --log-group-name "$LOG_GROUP" \
         --region $REGION \
@@ -87,15 +109,15 @@ if [[ "$response" =~ ^[Yy]$ ]]; then
         --query 'logStreams[0].logStreamName' \
         --output text 2>/dev/null)
     
-    if [[ "$LATEST_STREAM" != "None" && -n "$LATEST_STREAM" ]]; then
-        echo "📋 最新のログ (ストリーム: $LATEST_STREAM):"
-        aws logs get-log-events \
-            --log-group-name "$LOG_GROUP" \
-            --log-stream-name "$LATEST_STREAM" \
-            --region $REGION \
-            --query 'events[*].message' \
-            --output text
+    if [[ "$LATEST_STREAM" != "None" && -n "$LATEST_STREAM" && "$LATEST_STREAM" != "null" ]]; then
+        echo "📋 最新のログストリーム: $LATEST_STREAM"
+        # CloudWatch Logsコンソールへのリンクを生成
+        LOG_STREAM_ENCODED=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$LATEST_STREAM', safe=''))" 2>/dev/null || echo "$LATEST_STREAM")
+        LOG_GROUP_ENCODED=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$LOG_GROUP', safe=''))" 2>/dev/null || echo "$LOG_GROUP")
+        CONSOLE_URL="https://${REGION}.console.aws.amazon.com/cloudwatch/home?region=${REGION}#logsV2:log-groups/log-group/${LOG_GROUP_ENCODED}/log-events/${LOG_STREAM_ENCODED}"
+        echo "🔗 CloudWatch Logsで確認: $CONSOLE_URL"
     else
         echo "⚠️ ログが見つかりませんでした"
+        echo "💡 Lambda関数のロググループを手動で確認: /aws/lambda/$FUNCTION_NAME"
     fi
 fi

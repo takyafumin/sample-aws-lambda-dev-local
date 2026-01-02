@@ -197,9 +197,6 @@ EOF
     fi
 fi
 
-    fi
-fi
-
 echo ""
 echo "🎉 デプロイが完了しました！"
 echo "📋 デプロイ情報:"
