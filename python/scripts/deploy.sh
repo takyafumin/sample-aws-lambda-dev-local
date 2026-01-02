@@ -109,15 +109,6 @@ if check_lambda_function_exists "$FUNCTION_NAME" "$REGION"; then
         exit 1
     fi
     
-    # 環境変数の更新
-    env_vars=""
-    if [[ -n "$LAMBDA_BUCKET_NAME" ]]; then
-        env_vars="S3_BUCKET_NAME=$LAMBDA_BUCKET_NAME"
-    fi
-    if ! update_lambda_function_environment "$FUNCTION_NAME" "$REGION" "$env_vars"; then
-        exit 1
-    fi
-    
 else
     echo "${LOG_PREFIX_ERROR} Lambda関数が存在しません: $FUNCTION_NAME"
     echo "${LOG_PREFIX_INFO} Lambda関数を作成してください:"

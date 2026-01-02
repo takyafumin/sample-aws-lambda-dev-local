@@ -61,13 +61,13 @@ echo ""
 echo "🚀 AWS Lambda Runtime Interface Emulatorでテストを実行しています..."
 
 # AWS標準環境変数のリスト（存在する場合のみ設定）
+# 注意: S3_BUCKET_NAMEはDockerイメージビルド時に設定されているため除外
 ENV_ARGS=()
 AWS_ENV_VARS=(
     "AWS_ACCESS_KEY_ID"
     "AWS_SECRET_ACCESS_KEY"
     "AWS_DEFAULT_REGION"
     "AWS_SESSION_TOKEN"
-    "S3_BUCKET_NAME"
 )
 
 for var in "${AWS_ENV_VARS[@]}"; do

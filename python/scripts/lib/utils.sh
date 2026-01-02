@@ -93,10 +93,17 @@ build_docker_image() {
         echo "🏗️ クロスプラットフォームビルド: $DOCKER_PLATFORM"
     fi
     
+    # S3バケット名などの環境変数をビルド引数として渡す
+    local build_args=""
+    if [[ -n "$S3_BUCKET_NAME" ]]; then
+        build_args="$build_args --build-arg S3_BUCKET_NAME=$S3_BUCKET_NAME"
+        echo "🪣 S3バケット名をビルド引数として設定: $S3_BUCKET_NAME"
+    fi
+    
     if command -v docker buildx &> /dev/null; then
-        docker buildx build $DOCKER_PLATFORM -t "$image_name" -f "$dockerfile_path" . --load
+        docker buildx build $DOCKER_PLATFORM --no-cache $build_args -t "$image_name" -f "$dockerfile_path" . --load
     else
-        docker build $DOCKER_PLATFORM -t "$image_name" -f "$dockerfile_path" .
+        docker build $DOCKER_PLATFORM --no-cache $build_args -t "$image_name" -f "$dockerfile_path" .
     fi
     
     if [[ $? -eq 0 ]]; then

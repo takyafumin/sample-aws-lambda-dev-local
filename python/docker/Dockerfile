@@ -8,6 +8,12 @@ ENV UV_PROJECT_ENVIRONMENT=${LAMBDA_TASK_ROOT}/.venv
 ENV PYTHONPATH=${LAMBDA_TASK_ROOT}/src:${LAMBDA_TASK_ROOT}:${LAMBDA_TASK_ROOT}/.venv/lib/python3.13/site-packages \
     VIRTUAL_ENV=${LAMBDA_TASK_ROOT}/.venv
 
+# .envファイルからS3バケット名を設定するためのARG
+ARG S3_BUCKET_NAME
+
+# 環境変数として設定
+ENV S3_BUCKET_NAME=${S3_BUCKET_NAME}
+
 # アプリケーションの依存関係をインストール 
 WORKDIR ${LAMBDA_TASK_ROOT}
 

@@ -258,55 +258,6 @@ wait_for_lambda_function_ready() {
     return 1
 }
 
-# 関数: Lambda関数の環境変数更新（リトライ機能付き）
-update_lambda_function_environment() {
-    local function_name="$1"
-    local region="$2"
-    local environment_vars="$3"
-    local max_retries=5
-    local retry_wait=5
-    
-    if [[ -z "$environment_vars" ]]; then
-        echo "${LOG_PREFIX_WARNING} 環境変数が設定されていないため、環境変数の更新をスキップします"
-        return 0
-    fi
-    
-    echo "🔧 Lambda関数の環境変数を更新しています..."
-    
-    for retry in $(seq 1 $max_retries); do
-        local update_result=$(aws lambda update-function-configuration \
-            --function-name "$function_name" \
-            --region "$region" \
-            --environment "Variables={$environment_vars}" 2>&1)
-        local exit_code=$?
-        
-        if [[ $exit_code -eq 0 ]]; then
-            echo "${LOG_PREFIX_SUCCESS} Lambda関数の環境変数を更新しました"
-            return 0
-        fi
-        
-        # ResourceConflictException の場合はリトライ
-        if echo "$update_result" | grep -q "ResourceConflictException\|operation cannot be performed at this time"; then
-            if [[ $retry -lt $max_retries ]]; then
-                echo "${LOG_PREFIX_WARNING} リソース競合エラーが発生しました。${retry_wait}秒後にリトライします（試行 $retry/$max_retries）"
-                sleep $retry_wait
-                retry_wait=$((retry_wait * 2))  # 指数バックオフ
-                continue
-            else
-                echo "${LOG_PREFIX_ERROR} 最大リトライ回数に達しました。Lambda関数の環境変数の更新に失敗しました"
-                echo "$update_result"
-                return 1
-            fi
-        else
-            echo "${LOG_PREFIX_ERROR} Lambda関数の環境変数の更新に失敗しました"
-            echo "$update_result"
-            return 1
-        fi
-    done
-    
-    return 1
-}
-
 # 関数: Lambda関数の呼び出し
 invoke_lambda_function() {
     local function_name="$1"
