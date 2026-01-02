@@ -47,6 +47,9 @@ done
 echo "${LOG_PREFIX_DEPLOY} AWS Lambda デプロイを開始します..."
 echo ""
 
+# .envファイルから環境変数を読み込み
+load_env_file
+
 # 設定の読み込みと表示
 load_configuration
 display_configuration
@@ -90,6 +93,10 @@ echo ""
 if ! push_image_to_ecr "$DOCKER_IMAGE_NAME" "$ECR_REPOSITORY_URI" "latest"; then
     exit 1
 fi
+
+# ECRプッシュ後の待機（Lambda関数が自動的に新しいイメージを参照する可能性があるため）
+echo "⏳ ECRプッシュ完了後、Lambda関数の安定化を待機中..."
+sleep 10
 echo ""
 
 # Lambda関数の存在確認とデプロイ

@@ -206,11 +206,65 @@ update_lambda_function_code() {
     fi
 }
 
-# 関数: Lambda関数の環境変数更新
+# 関数: Lambda関数の状態確認（更新可能かチェック）
+wait_for_lambda_function_ready() {
+    local function_name="$1"
+    local region="$2"
+    local max_attempts=60  # 最大10分待機
+    local wait_seconds=10
+    
+    echo "⏳ Lambda関数の更新準備完了を待機中..."
+    
+    for attempt in $(seq 1 $max_attempts); do
+        local function_info=$(aws lambda get-function-configuration \
+            --function-name "$function_name" \
+            --region "$region" \
+            --query '{State: State, LastUpdateStatus: LastUpdateStatus, LastUpdateStatusReason: LastUpdateStatusReason}' \
+            --output json 2>/dev/null)
+        
+        if [[ -z "$function_info" ]]; then
+            echo "   試行 $attempt/$max_attempts: 関数情報の取得に失敗 - ${wait_seconds}秒待機中..."
+            sleep $wait_seconds
+            continue
+        fi
+        
+        local state=$(echo "$function_info" | python3 -c "import sys, json; print(json.load(sys.stdin).get('State', 'Unknown'))" 2>/dev/null || echo "Unknown")
+        local last_update_status=$(echo "$function_info" | python3 -c "import sys, json; print(json.load(sys.stdin).get('LastUpdateStatus', 'Unknown'))" 2>/dev/null || echo "Unknown")
+        local update_reason=$(echo "$function_info" | python3 -c "import sys, json; print(json.load(sys.stdin).get('LastUpdateStatusReason', ''))" 2>/dev/null || echo "")
+        
+        # 正常状態の確認
+        if [[ "$state" == "Active" ]] && [[ "$last_update_status" == "Successful" ]]; then
+            echo "${LOG_PREFIX_SUCCESS} Lambda関数が更新可能な状態になりました"
+            return 0
+        fi
+        
+        # 失敗状態の確認
+        if [[ "$last_update_status" == "Failed" ]]; then
+            echo "${LOG_PREFIX_ERROR} Lambda関数の更新が失敗状態です: $update_reason"
+            return 1
+        fi
+        
+        # 進行中状態の表示
+        if [[ "$state" == "Pending" ]] || [[ "$last_update_status" == "InProgress" ]]; then
+            echo "   試行 $attempt/$max_attempts: 状態=${state}, 更新状況=${last_update_status} - ECRイメージ処理中の可能性 (${wait_seconds}秒待機)"
+        else
+            echo "   試行 $attempt/$max_attempts: 状態=${state}, 更新状況=${last_update_status} - ${wait_seconds}秒待機中..."
+        fi
+        
+        sleep $wait_seconds
+    done
+    
+    echo "${LOG_PREFIX_ERROR} Lambda関数が更新可能な状態になりませんでした（タイムアウト）"
+    return 1
+}
+
+# 関数: Lambda関数の環境変数更新（リトライ機能付き）
 update_lambda_function_environment() {
     local function_name="$1"
     local region="$2"
     local environment_vars="$3"
+    local max_retries=5
+    local retry_wait=5
     
     if [[ -z "$environment_vars" ]]; then
         echo "${LOG_PREFIX_WARNING} 環境変数が設定されていないため、環境変数の更新をスキップします"
@@ -219,18 +273,38 @@ update_lambda_function_environment() {
     
     echo "🔧 Lambda関数の環境変数を更新しています..."
     
-    aws lambda update-function-configuration \
-        --function-name "$function_name" \
-        --region "$region" \
-        --environment "Variables={$environment_vars}"
+    for retry in $(seq 1 $max_retries); do
+        local update_result=$(aws lambda update-function-configuration \
+            --function-name "$function_name" \
+            --region "$region" \
+            --environment "Variables={$environment_vars}" 2>&1)
+        local exit_code=$?
+        
+        if [[ $exit_code -eq 0 ]]; then
+            echo "${LOG_PREFIX_SUCCESS} Lambda関数の環境変数を更新しました"
+            return 0
+        fi
+        
+        # ResourceConflictException の場合はリトライ
+        if echo "$update_result" | grep -q "ResourceConflictException\|operation cannot be performed at this time"; then
+            if [[ $retry -lt $max_retries ]]; then
+                echo "${LOG_PREFIX_WARNING} リソース競合エラーが発生しました。${retry_wait}秒後にリトライします（試行 $retry/$max_retries）"
+                sleep $retry_wait
+                retry_wait=$((retry_wait * 2))  # 指数バックオフ
+                continue
+            else
+                echo "${LOG_PREFIX_ERROR} 最大リトライ回数に達しました。Lambda関数の環境変数の更新に失敗しました"
+                echo "$update_result"
+                return 1
+            fi
+        else
+            echo "${LOG_PREFIX_ERROR} Lambda関数の環境変数の更新に失敗しました"
+            echo "$update_result"
+            return 1
+        fi
+    done
     
-    if [[ $? -eq 0 ]]; then
-        echo "${LOG_PREFIX_SUCCESS} Lambda関数の環境変数を更新しました"
-        return 0
-    else
-        echo "${LOG_PREFIX_ERROR} Lambda関数の環境変数の更新に失敗しました"
-        return 1
-    fi
+    return 1
 }
 
 # 関数: Lambda関数の呼び出し
