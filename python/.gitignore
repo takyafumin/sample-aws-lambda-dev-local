@@ -1,1 +1,26 @@
+# 環境変数ファイル
 .env
+docker/.env
+
+# テスト関連の一時ファイル
+**/response.json
+
+# Python関連
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.coverage
+.pytest_cache/
+
+# IDEファイル
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS関連
+.DS_Store
+Thumbs.db

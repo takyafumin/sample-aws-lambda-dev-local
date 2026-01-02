@@ -14,19 +14,40 @@ def getBucketObjectNames():
         array: バケットオブジェクト名の配列
     """
     try:
-        access_key = os.getenv("ACCESS_KEY")
-        secret_key = os.getenv("SECRET_KEY")
-        bucket_name = os.getenv("BUCKET_NAME")
+        # 環境変数の取得（推奨: S3_BUCKET_NAME, 後方互換: AWS_BUCKET_NAME）
+        bucket_name = os.getenv("S3_BUCKET_NAME") or os.getenv("AWS_BUCKET_NAME")
 
-        if not access_key or not secret_key or not bucket_name:
-            print("Error: Missing required environment variables")
+        if not bucket_name:
+            print("Error: Missing required environment variable (S3_BUCKET_NAME)")
             return []
 
-        s3 = boto3.resource(
-            "s3",
-            aws_access_key_id=access_key,
-            aws_secret_access_key=secret_key,
-        )
+        # Lambda環境の判定（AWS_LAMBDA_FUNCTION_NAMEが存在するかで判定）
+        is_lambda_env = os.getenv("AWS_LAMBDA_FUNCTION_NAME") is not None
+
+        if is_lambda_env:
+            # Lambda実行環境: IAM Roleを使用（デフォルト認証）
+            print("Running in Lambda environment - using IAM Role for S3 access")
+            s3 = boto3.resource("s3")
+        else:
+            # ローカル開発環境: 明示的な認証情報を使用
+            access_key = os.getenv("AWS_ACCESS_KEY_ID")
+            secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
+
+            if access_key and secret_key:
+                print(
+                    "Running in local environment - using API credentials for S3 access"
+                )
+                s3 = boto3.resource(
+                    "s3",
+                    aws_access_key_id=access_key,
+                    aws_secret_access_key=secret_key,
+                )
+            else:
+                print(
+                    "Local environment detected but no API credentials found - trying default credentials"
+                )
+                s3 = boto3.resource("s3")
+
         bucket = s3.Bucket(bucket_name)
         bucket_names = []
         for obj in bucket.objects.all():
