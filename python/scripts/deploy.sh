@@ -27,6 +27,24 @@ DOCKER_IMAGE_NAME="${DOCKER_IMAGE_NAME:-aws-lambda-python-sample}"
 ACCOUNT_ID="${AWS_ACCOUNT_ID}"
 ECR_REPOSITORY_NAME="${ECR_REPOSITORY_NAME:-aws-lambda-python-sample}"
 
+echo "📋 デプロイ設定の確認..."
+echo "   Function Name: $FUNCTION_NAME"
+echo "   Region: $REGION"
+echo "   Docker Image: $DOCKER_IMAGE_NAME"
+echo "   ECR Repository: $ECR_REPOSITORY_NAME"
+
+# Lambda環境変数の確認
+if [[ -n "$AWS_BUCKET_NAME" ]] || [[ -n "$S3_BUCKET_NAME" ]]; then
+    echo "   S3バケット名: 設定済み ✅"
+    LAMBDA_BUCKET_NAME="${S3_BUCKET_NAME:-$AWS_BUCKET_NAME}"
+else
+    echo "   S3バケット名: 未設定 ⚠️"
+    echo "   💡 Lambda関数でS3にアクセスする場合は以下の環境変数を設定してください:"
+    echo "      export S3_BUCKET_NAME=your-bucket-name"
+    echo "   注意: IAM Roleによる認証を使用します（APIキーは不要）"
+    LAMBDA_BUCKET_NAME=""
+fi
+
 # AWS Account IDを取得（環境変数で設定されていない場合）
 if [[ -z "$ACCOUNT_ID" ]]; then
     ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
@@ -119,6 +137,17 @@ if aws lambda get-function --function-name $FUNCTION_NAME --region $REGION &> /d
         --function-name $FUNCTION_NAME \
         --image-uri $ECR_REPOSITORY_URI:latest \
         --region $REGION
+    
+    # 環境変数の設定
+    echo "🔧 Lambda関数の環境変数を更新しています..."
+    if [[ -n "$LAMBDA_BUCKET_NAME" ]]; then
+        aws lambda update-function-configuration \
+            --function-name $FUNCTION_NAME \
+            --region $REGION \
+            --environment "Variables={S3_BUCKET_NAME=$LAMBDA_BUCKET_NAME}"
+    else
+        echo "   ⚠️ S3バケット名が設定されていないため、環境変数の更新をスキップします"
+    fi
 else
     echo "❌ Lambda関数が存在しません: $FUNCTION_NAME"
     echo "💡 Lambda関数を作成してください:"
@@ -171,6 +200,11 @@ EOF
                 --role-name $ROLE_NAME \
                 --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
             
+            # S3アクセスポリシーをアタッチ
+            aws iam attach-role-policy \
+                --role-name $ROLE_NAME \
+                --policy-arn arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+            
             rm /tmp/trust-policy.json
             echo "✅ Lambda実行ロールを作成しました"
             
@@ -182,14 +216,26 @@ EOF
         fi
         
         # Lambda関数を作成
-        aws lambda create-function \
-            --function-name $FUNCTION_NAME \
-            --package-type Image \
-            --code ImageUri=$ECR_REPOSITORY_URI:latest \
-            --role $ROLE_ARN \
-            --region $REGION \
-            --timeout 30 \
-            --memory-size 512
+        if [[ -n "$LAMBDA_BUCKET_NAME" ]]; then
+            aws lambda create-function \
+                --function-name $FUNCTION_NAME \
+                --package-type Image \
+                --code ImageUri=$ECR_REPOSITORY_URI:latest \
+                --role $ROLE_ARN \
+                --region $REGION \
+                --timeout 30 \
+                --memory-size 512 \
+                --environment "Variables={S3_BUCKET_NAME=$LAMBDA_BUCKET_NAME}"
+        else
+            aws lambda create-function \
+                --function-name $FUNCTION_NAME \
+                --package-type Image \
+                --code ImageUri=$ECR_REPOSITORY_URI:latest \
+                --role $ROLE_ARN \
+                --region $REGION \
+                --timeout 30 \
+                --memory-size 512
+        fi
         echo "✅ Lambda関数を作成しました"
     else
         echo "⏭️ Lambda関数の作成をスキップしました"

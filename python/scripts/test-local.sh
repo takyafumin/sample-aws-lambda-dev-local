@@ -71,8 +71,14 @@ if [[ -z "$AWS_DEFAULT_REGION" ]]; then
 fi
 
 # Lambda関数で必要なAWS標準環境変数の確認
-REQUIRED_VARS=("AWS_ACCESS_KEY_ID" "AWS_SECRET_ACCESS_KEY" "AWS_BUCKET_NAME")
+REQUIRED_VARS=("AWS_ACCESS_KEY_ID" "AWS_SECRET_ACCESS_KEY" "S3_BUCKET_NAME")
 MISSING_VARS=()
+
+# 後方互換性チェック: AWS_BUCKET_NAME が使われている場合は警告
+if [[ -n "$AWS_BUCKET_NAME" ]] && [[ -z "$S3_BUCKET_NAME" ]]; then
+    echo "⚠️  AWS_BUCKET_NAME は非推奨です。S3_BUCKET_NAME を使用してください。"
+    export S3_BUCKET_NAME="$AWS_BUCKET_NAME"
+fi
 
 for var in "${REQUIRED_VARS[@]}"; do
     if [[ -z "${!var}" ]]; then
@@ -90,12 +96,12 @@ if [[ ${#MISSING_VARS[@]} -gt 0 ]]; then
     echo "   1. .envファイルを作成してください:"
     echo "      AWS_ACCESS_KEY_ID=your_access_key"
     echo "      AWS_SECRET_ACCESS_KEY=your_secret_key"
-    echo "      AWS_BUCKET_NAME=your_bucket_name"
+    echo "      S3_BUCKET_NAME=your_bucket_name"
     echo ""
     echo "   2. 環境変数として設定してください:"
     echo "      export AWS_ACCESS_KEY_ID=your_access_key"
     echo "      export AWS_SECRET_ACCESS_KEY=your_secret_key"
-    echo "      export AWS_BUCKET_NAME=your_bucket_name"
+    echo "      export S3_BUCKET_NAME=your_bucket_name"
     echo ""
     echo "🤔 環境変数なしでテストを続行しますか？ (y/N)"
     read -r response
@@ -118,7 +124,7 @@ AWS_ENV_VARS=(
     "AWS_SECRET_ACCESS_KEY"
     "AWS_DEFAULT_REGION"
     "AWS_SESSION_TOKEN"
-    "AWS_BUCKET_NAME"
+    "S3_BUCKET_NAME"
 )
 
 for var in "${AWS_ENV_VARS[@]}"; do
