@@ -48,6 +48,11 @@ uv run pytest tests/
 ```bash
 # 自動デプロイ（ECRリポジトリ・Lambda関数も自動作成）
 ./scripts/deploy.sh
+
+# 確認プロンプトなしで自動デプロイ（CI/CD用）
+./scripts/deploy.sh --auto-create
+# または
+./scripts/deploy.sh -a
 ```
 
 ### 4. AWS実行確認
@@ -65,7 +70,7 @@ uv run pytest tests/
 ├── docker/Dockerfile                 # Lambda用Dockerファイル
 ├── scripts/                          # 自動化スクリプト
 │   ├── test-local.sh                # Dockerローカルテスト
-│   ├── deploy.sh                    # AWSデプロイ
+│   ├── deploy.sh                    # AWSデプロイ（自動作成対応）
 │   └── test-remote.sh               # AWSリモートテスト
 ├── pyproject.toml                    # Python設定
 └── uv.lock                          # 依存関係ロック
@@ -74,6 +79,22 @@ uv run pytest tests/
 ## 機能概要
 
 このLambda関数は、S3バケット内のオブジェクト一覧を取得します。
+
+## デプロイオプション
+
+### 基本デプロイ
+```bash
+./scripts/deploy.sh
+```
+- Lambda関数が存在しない場合は作成確認を求めます
+- 手動操作が必要です
+
+### 自動デプロイ（CI/CD用）
+```bash
+./scripts/deploy.sh --auto-create
+```
+- 確認プロンプトなしで自動的にLambda関数を作成します
+- CI/CDパイプラインに適しています
 
 ## カスタマイズ
 

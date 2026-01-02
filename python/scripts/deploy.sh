@@ -4,6 +4,22 @@
 
 set -e
 
+# コマンドライン引数の処理
+AUTO_CREATE_FUNCTION=false
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --auto-create|-a)
+            AUTO_CREATE_FUNCTION=true
+            shift
+            ;;
+        *)
+            echo "❓ 未知のオプション: $1"
+            echo "💡 使用方法: $0 [--auto-create | -a]"
+            exit 1
+            ;;
+    esac
+done
+
 # 変数設定
 FUNCTION_NAME="${FUNCTION_NAME:-aws-sample-lambda}"
 REGION="${AWS_DEFAULT_REGION:-ap-northeast-1}"
@@ -114,7 +130,14 @@ else
     echo "       --region $REGION"
     echo ""
     echo "🤔 Lambda関数を自動作成しますか？ (y/N)"
-    read -r response
+    
+    if [[ "$AUTO_CREATE_FUNCTION" == true ]]; then
+        echo "🚀 --auto-create オプションが指定されているため、自動的に関数を作成します"
+        response="y"
+    else
+        read -r response
+    fi
+    
     if [[ "$response" =~ ^[Yy]$ ]]; then
         echo "🆕 Lambda関数を作成しています..."
         
