@@ -10,12 +10,18 @@ ENV PYTHONPATH=${LAMBDA_TASK_ROOT}/src:${LAMBDA_TASK_ROOT}:${LAMBDA_TASK_ROOT}/.
 
 # アプリケーションの依存関係をインストール 
 WORKDIR ${LAMBDA_TASK_ROOT}
-COPY ../uv.lock ../pyproject.toml ./
+
+# 依存関係ファイルをコピー（macOSからのビルドでもパスが正しく解決されるように調整）
+COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev
 
-COPY ../src/handlers/lambda_handler.py ${LAMBDA_TASK_ROOT}/src/handlers/
+# ソースコードをコピー
+COPY src/handlers/lambda_handler.py ${LAMBDA_TASK_ROOT}/src/handlers/
+COPY src/__init__.py ${LAMBDA_TASK_ROOT}/src/
+
+# 環境変数ファイルをコピー（存在する場合のみ）
 # FIXME: .envファイルで認証情報をコンテナにセットするのはよくない
-COPY .env ${LAMBDA_TASK_ROOT}
+COPY docker/.env ${LAMBDA_TASK_ROOT}/ 2>/dev/null || echo ".envファイルが見つかりません（オプション）"
 
 CMD ["src.handlers.lambda_handler.lambda_handler"]
