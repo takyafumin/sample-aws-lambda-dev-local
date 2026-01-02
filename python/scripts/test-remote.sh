@@ -7,7 +7,7 @@ set -e
 # 変数設定
 FUNCTION_NAME="${FUNCTION_NAME:-aws-sample-lambda}"
 REGION="${AWS_DEFAULT_REGION:-ap-northeast-1}"
-TEST_EVENT="${1:-test_event.json}"
+TEST_EVENT="${1:-resources/events/test_event_remote.json}"
 OUTPUT_FILE="${2:-response.json}"
 
 echo "☁️ リモートLambda関数のテストを開始します..."
@@ -31,21 +31,14 @@ fi
 # テストイベントファイルの存在確認・作成
 if [[ ! -f "$TEST_EVENT" ]]; then
     echo "📝 テストイベントファイルを作成しています: $TEST_EVENT"
+    # ディレクトリが存在しない場合は作成
+    mkdir -p "$(dirname "$TEST_EVENT")"
     cat > "$TEST_EVENT" << 'EOF'
 {
-    "Records": [
-        {
-            "messageId": "test-message-id-remote",
-            "receiptHandle": "test-receipt-handle",
-            "body": "{\"message\": \"Hello from remote Lambda test\"}",
-            "attributes": {},
-            "messageAttributes": {},
-            "md5OfBody": "test-md5",
-            "eventSource": "aws:sqs",
-            "eventSourceARN": "arn:aws:sqs:ap-northeast-1:123456789012:test-queue",
-            "awsRegion": "ap-northeast-1"
-        }
-    ]
+    "test_mode": "remote",
+    "message": "Hello from remote Lambda test",
+    "environment": "production",
+    "timestamp": "2026-01-02T00:00:00Z"
 }
 EOF
 fi

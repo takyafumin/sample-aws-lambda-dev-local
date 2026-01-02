@@ -6,7 +6,7 @@ set -e
 
 # 変数設定
 DOCKER_IMAGE_NAME="${DOCKER_IMAGE_NAME:-aws-lambda-python-sample}"
-TEST_EVENT="${1:-test_event.json}"
+TEST_EVENT="${1:-resources/events/test_event.json}"
 
 echo "🧪 Lambda関数のローカルテストを開始します..."
 
@@ -39,21 +39,13 @@ fi
 # テストイベントファイルの存在確認
 if [[ ! -f "$TEST_EVENT" ]]; then
     echo "📝 テストイベントファイルを作成しています: $TEST_EVENT"
+    # ディレクトリが存在しない場合は作成
+    mkdir -p "$(dirname "$TEST_EVENT")"
     cat > "$TEST_EVENT" << 'EOF'
 {
-    "Records": [
-        {
-            "messageId": "test-message-id",
-            "receiptHandle": "test-receipt-handle",
-            "body": "{\"message\": \"Hello from local test\"}",
-            "attributes": {},
-            "messageAttributes": {},
-            "md5OfBody": "test-md5",
-            "eventSource": "aws:sqs",
-            "eventSourceARN": "arn:aws:sqs:ap-northeast-1:123456789012:test-queue",
-            "awsRegion": "ap-northeast-1"
-        }
-    ]
+    "test_mode": "local",
+    "message": "Hello from local test",
+    "timestamp": "2026-01-02T00:00:00Z"
 }
 EOF
 fi

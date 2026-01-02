@@ -39,8 +39,11 @@ uv run pytest tests/
 ### 2. ローカル実行（Docker）
 
 ```bash
-# Dockerでテスト実行
+# Dockerでテスト実行（Lambda直接実行用シンプルイベント）
 ./scripts/test-local.sh
+
+# カスタムイベントファイルでテスト
+./scripts/test-local.sh my-custom-event.json
 ```
 
 ### 3. AWSデプロイ
@@ -58,8 +61,11 @@ uv run pytest tests/
 ### 4. AWS実行確認
 
 ```bash
-# デプロイされたLambda関数をテスト
+# デプロイされたLambda関数をテスト（Lambda直接実行用イベント）
 ./scripts/test-remote.sh
+
+# カスタムイベントファイルでリモートテスト
+./scripts/test-remote.sh my-remote-event.json
 ```
 
 ## プロジェクト構成
@@ -68,6 +74,9 @@ uv run pytest tests/
 ├── src/handlers/lambda_handler.py    # メインのLambda関数
 ├── tests/test_lambda_handler.py      # テストファイル
 ├── docker/Dockerfile                 # Lambda用Dockerファイル
+├── resources/events/                 # テストイベントファイル
+│   ├── test_event.json              # ローカルテスト用（直接実行）
+│   └── test_event_remote.json       # リモートテスト用（直接実行）
 ├── scripts/                          # 自動化スクリプト
 │   ├── test-local.sh                # Dockerローカルテスト
 │   ├── deploy.sh                    # AWSデプロイ（自動作成対応）
