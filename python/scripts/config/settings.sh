@@ -54,10 +54,7 @@ load_configuration() {
         export ECR_REPOSITORY_URI="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/${ECR_REPOSITORY_NAME}"
     fi
     
-    # S3バケット名の設定（後方互換性対応）
-    if [[ -n "$AWS_BUCKET_NAME" ]] && [[ -z "$S3_BUCKET_NAME" ]]; then
-        export S3_BUCKET_NAME="$AWS_BUCKET_NAME"
-    fi
+    # S3バケット名の設定
     export LAMBDA_BUCKET_NAME="${S3_BUCKET_NAME}"
     
     # IAM Role ARNを構築
