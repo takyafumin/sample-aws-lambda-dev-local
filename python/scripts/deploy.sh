@@ -1,8 +1,16 @@
 #!/bin/bash
 
-# AWS Lambda 関数のデプロイスクリプト (macOS対応)
+# AWS Lambda 関数のデプロイスクリプト (リファクタリング版)
 
 set -e
+
+# スクリプトのディレクトリを取得
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# 共通ライブラリの読み込み
+source "$SCRIPT_DIR/config/settings.sh"
+source "$SCRIPT_DIR/lib/utils.sh"
+source "$SCRIPT_DIR/infra/aws-resources.sh"
 
 # コマンドライン引数の処理
 AUTO_CREATE_FUNCTION=false
@@ -12,231 +20,124 @@ while [[ $# -gt 0 ]]; do
             AUTO_CREATE_FUNCTION=true
             shift
             ;;
+        --help|-h)
+            echo "AWS Lambda デプロイスクリプト"
+            echo ""
+            echo "使用方法: $0 [オプション]"
+            echo ""
+            echo "オプション:"
+            echo "  --auto-create, -a    Lambda関数が存在しない場合、自動的に作成"
+            echo "  --help, -h          このヘルプメッセージを表示"
+            echo ""
+            echo "必要な環境変数:"
+            echo "  FUNCTION_NAME       Lambda関数名 (デフォルト: aws-sample-lambda)"
+            echo "  AWS_DEFAULT_REGION  AWSリージョン (デフォルト: ap-northeast-1)"
+            echo "  S3_BUCKET_NAME      S3バケット名 (オプション)"
+            exit 0
+            ;;
         *)
             echo "❓ 未知のオプション: $1"
-            echo "💡 使用方法: $0 [--auto-create | -a]"
+            echo "💡 使用方法: $0 [--auto-create | -a] [--help | -h]"
             exit 1
             ;;
     esac
 done
 
-# 変数設定
-FUNCTION_NAME="${FUNCTION_NAME:-aws-sample-lambda}"
-REGION="${AWS_DEFAULT_REGION:-ap-northeast-1}"
-DOCKER_IMAGE_NAME="${DOCKER_IMAGE_NAME:-aws-lambda-python-sample}"
-ACCOUNT_ID="${AWS_ACCOUNT_ID}"
-ECR_REPOSITORY_NAME="${ECR_REPOSITORY_NAME:-aws-lambda-python-sample}"
+# メイン処理開始
+echo "${LOG_PREFIX_DEPLOY} AWS Lambda デプロイを開始します..."
+echo ""
 
-echo "📋 デプロイ設定の確認..."
-echo "   Function Name: $FUNCTION_NAME"
-echo "   Region: $REGION"
-echo "   Docker Image: $DOCKER_IMAGE_NAME"
-echo "   ECR Repository: $ECR_REPOSITORY_NAME"
+# 設定の読み込みと表示
+load_configuration
+display_configuration
+echo ""
 
-# Lambda環境変数の確認
-if [[ -n "$AWS_BUCKET_NAME" ]] || [[ -n "$S3_BUCKET_NAME" ]]; then
-    echo "   S3バケット名: 設定済み ✅"
-    LAMBDA_BUCKET_NAME="${S3_BUCKET_NAME:-$AWS_BUCKET_NAME}"
-else
-    echo "   S3バケット名: 未設定 ⚠️"
-    echo "   💡 Lambda関数でS3にアクセスする場合は以下の環境変数を設定してください:"
-    echo "      export S3_BUCKET_NAME=your-bucket-name"
-    echo "   注意: IAM Roleによる認証を使用します（APIキーは不要）"
-    LAMBDA_BUCKET_NAME=""
-fi
+# プラットフォーム判定
+detect_platform
+echo ""
 
-# AWS Account IDを取得（環境変数で設定されていない場合）
-if [[ -z "$ACCOUNT_ID" ]]; then
-    ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-fi
-
-ECR_REPOSITORY_URI="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/${ECR_REPOSITORY_NAME}"
-
-# macOS対応: Apple Silicon (M1/M2) チェック
-if [[ "$(uname)" == "Darwin" ]]; then
-    echo "🍎 macOSを検出しました"
-    if [[ "$(uname -m)" == "arm64" ]]; then
-        echo "🔧 Apple Silicon (M1/M2) を検出しました - x86_64プラットフォームでビルドします"
-        DOCKER_PLATFORM="--platform linux/amd64"
-    else
-        echo "🔧 Intel Macを検出しました"
-        DOCKER_PLATFORM=""
-    fi
-else
-    echo "🐧 Linux環境を検出しました"
-    DOCKER_PLATFORM=""
-fi
-
-# 必要ツールの存在確認
-check_command() {
-    if ! command -v "$1" &> /dev/null; then
-        echo "❌ $1 が見つかりません"
-        if [[ "$(uname)" == "Darwin" ]]; then
-            echo "💡 Homebrewでインストールしてください: brew install $2"
-        else
-            echo "💡 パッケージマネージャーでインストールしてください"
-        fi
-        exit 1
-    fi
-}
-
-echo "🔍 必要なツールの確認中..."
-check_command "docker" "docker"
-check_command "aws" "awscli"
-
-# AWS認証情報の確認
-if ! aws sts get-caller-identity &> /dev/null; then
-    echo "❌ AWS認証情報が設定されていません"
-    echo "💡 以下のコマンドでAWS CLIを設定してください:"
-    echo "   aws configure"
-    echo "   または AWS_PROFILE環境変数を設定してください"
+# 必要なツールの確認
+if ! check_required_commands "docker" "aws"; then
     exit 1
 fi
+echo ""
 
-echo "✅ AWS認証情報を確認しました: $(aws sts get-caller-identity --query 'Arn' --output text)"
-
-echo "🚀 Lambda関数のデプロイを開始します..."
+# AWS認証情報の確認
+if ! verify_aws_credentials; then
+    exit 1
+fi
+echo ""
 
 # Dockerイメージのビルド
-echo "📦 Dockerイメージをビルドしています..."
-if [[ -n "$DOCKER_PLATFORM" ]]; then
-    echo "🏗️ クロスプラットフォームビルド: $DOCKER_PLATFORM"
+if ! build_docker_image "$DOCKER_IMAGE_NAME" "docker/Dockerfile"; then
+    exit 1
 fi
-
-docker buildx build $DOCKER_PLATFORM -t $DOCKER_IMAGE_NAME -f docker/Dockerfile . --load
+echo ""
 
 # ECRリポジトリの存在確認・作成
-echo "🗂️ ECRリポジトリを確認しています..."
-if ! aws ecr describe-repositories --repository-names $ECR_REPOSITORY_NAME --region $REGION &> /dev/null; then
-    echo "📁 ECRリポジトリを作成しています: $ECR_REPOSITORY_NAME"
-    aws ecr create-repository \
-        --repository-name $ECR_REPOSITORY_NAME \
-        --region $REGION \
-        --image-scanning-configuration scanOnPush=true
-    echo "✅ ECRリポジトリを作成しました"
-else
-    echo "✅ ECRリポジトリが存在しています: $ECR_REPOSITORY_NAME"
+if ! ensure_ecr_repository "$ECR_REPOSITORY_NAME" "$REGION"; then
+    exit 1
 fi
+echo ""
 
 # ECRにログイン
-echo "🔐 ECRにログインしています..."
-aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $ECR_REPOSITORY_URI
+if ! login_to_ecr "$REGION" "$ECR_REPOSITORY_URI"; then
+    exit 1
+fi
+echo ""
 
 # ECRにプッシュ
-echo "📤 ECRにイメージをプッシュしています..."
-docker tag $DOCKER_IMAGE_NAME:latest $ECR_REPOSITORY_URI:latest
-docker push $ECR_REPOSITORY_URI:latest
+if ! push_image_to_ecr "$DOCKER_IMAGE_NAME" "$ECR_REPOSITORY_URI" "latest"; then
+    exit 1
+fi
+echo ""
 
-# Lambda関数の存在確認
+# Lambda関数の存在確認とデプロイ
 echo "🔍 Lambda関数の存在を確認しています..."
-if aws lambda get-function --function-name $FUNCTION_NAME --region $REGION &> /dev/null; then
-    echo "✅ Lambda関数が存在しています。コードを更新します..."
-    # Lambda関数の更新
-    echo "🔄 Lambda関数を更新しています..."
-    aws lambda update-function-code \
-        --function-name $FUNCTION_NAME \
-        --image-uri $ECR_REPOSITORY_URI:latest \
-        --region $REGION
+if check_lambda_function_exists "$FUNCTION_NAME" "$REGION"; then
+    echo "${LOG_PREFIX_SUCCESS} Lambda関数が存在しています。コードを更新します..."
     
-    # 環境変数の設定
-    echo "🔧 Lambda関数の環境変数を更新しています..."
-    if [[ -n "$LAMBDA_BUCKET_NAME" ]]; then
-        aws lambda update-function-configuration \
-            --function-name $FUNCTION_NAME \
-            --region $REGION \
-            --environment "Variables={S3_BUCKET_NAME=$LAMBDA_BUCKET_NAME}"
-    else
-        echo "   ⚠️ S3バケット名が設定されていないため、環境変数の更新をスキップします"
+    # Lambda関数のコード更新
+    if ! update_lambda_function_code "$FUNCTION_NAME" "$ECR_REPOSITORY_URI:latest" "$REGION"; then
+        exit 1
     fi
+    
+    # 環境変数の更新
+    env_vars=""
+    if [[ -n "$LAMBDA_BUCKET_NAME" ]]; then
+        env_vars="S3_BUCKET_NAME=$LAMBDA_BUCKET_NAME"
+    fi
+    if ! update_lambda_function_environment "$FUNCTION_NAME" "$REGION" "$env_vars"; then
+        exit 1
+    fi
+    
 else
-    echo "❌ Lambda関数が存在しません: $FUNCTION_NAME"
-    echo "💡 Lambda関数を作成してください:"
+    echo "${LOG_PREFIX_ERROR} Lambda関数が存在しません: $FUNCTION_NAME"
+    echo "${LOG_PREFIX_INFO} Lambda関数を作成してください:"
     echo "   aws lambda create-function \\"
     echo "       --function-name $FUNCTION_NAME \\"
     echo "       --package-type Image \\"
     echo "       --code ImageUri=$ECR_REPOSITORY_URI:latest \\"
-    echo "       --role arn:aws:iam::$ACCOUNT_ID:role/lambda-execution-role \\"
+    echo "       --role $ROLE_ARN \\"
     echo "       --region $REGION"
     echo ""
-    echo "🤔 Lambda関数を自動作成しますか？ (y/N)"
     
-    if [[ "$AUTO_CREATE_FUNCTION" == true ]]; then
-        echo "🚀 --auto-create オプションが指定されているため、自動的に関数を作成します"
-        response="y"
-    else
-        read -r response
-    fi
-    
-    if [[ "$response" =~ ^[Yy]$ ]]; then
-        echo "🆕 Lambda関数を作成しています..."
-        
+    if confirm_action "🤔 Lambda関数を自動作成しますか？ (y/N)" "N" "$AUTO_CREATE_FUNCTION"; then
         # 実行ロールの確認・作成
-        ROLE_NAME="lambda-execution-role"
-        ROLE_ARN="arn:aws:iam::$ACCOUNT_ID:role/$ROLE_NAME"
+        if ! ensure_lambda_execution_role "$LAMBDA_ROLE_NAME" "$ACCOUNT_ID"; then
+            exit 1
+        fi
         
-        if ! aws iam get-role --role-name $ROLE_NAME &> /dev/null; then
-            echo "👤 Lambda実行ロールを作成しています..."
-            # 信頼関係ドキュメント
-            cat > /tmp/trust-policy.json << EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {
-        "Service": "lambda.amazonaws.com"
-      },
-      "Action": "sts:AssumeRole"
-    }
-  ]
-}
-EOF
-            aws iam create-role \
-                --role-name $ROLE_NAME \
-                --assume-role-policy-document file:///tmp/trust-policy.json
-            
-            # 基本実行ポリシーをアタッチ
-            aws iam attach-role-policy \
-                --role-name $ROLE_NAME \
-                --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-            
-            # S3アクセスポリシーをアタッチ
-            aws iam attach-role-policy \
-                --role-name $ROLE_NAME \
-                --policy-arn arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
-            
-            rm /tmp/trust-policy.json
-            echo "✅ Lambda実行ロールを作成しました"
-            
-            # ロールが反映されるまで少し待機
-            echo "⏳ ロールの反映を待機しています..."
-            sleep 10
-        else
-            echo "✅ Lambda実行ロールが存在しています"
+        # 環境変数の準備
+        env_vars=""
+        if [[ -n "$LAMBDA_BUCKET_NAME" ]]; then
+            env_vars="S3_BUCKET_NAME=$LAMBDA_BUCKET_NAME"
         fi
         
         # Lambda関数を作成
-        if [[ -n "$LAMBDA_BUCKET_NAME" ]]; then
-            aws lambda create-function \
-                --function-name $FUNCTION_NAME \
-                --package-type Image \
-                --code ImageUri=$ECR_REPOSITORY_URI:latest \
-                --role $ROLE_ARN \
-                --region $REGION \
-                --timeout 30 \
-                --memory-size 512 \
-                --environment "Variables={S3_BUCKET_NAME=$LAMBDA_BUCKET_NAME}"
-        else
-            aws lambda create-function \
-                --function-name $FUNCTION_NAME \
-                --package-type Image \
-                --code ImageUri=$ECR_REPOSITORY_URI:latest \
-                --role $ROLE_ARN \
-                --region $REGION \
-                --timeout 30 \
-                --memory-size 512
+        if ! create_lambda_function "$FUNCTION_NAME" "$ECR_REPOSITORY_URI:latest" "$ROLE_ARN" "$REGION" "$env_vars" "$DEFAULT_TIMEOUT" "$DEFAULT_MEMORY_SIZE"; then
+            exit 1
         fi
-        echo "✅ Lambda関数を作成しました"
     else
         echo "⏭️ Lambda関数の作成をスキップしました"
         exit 0
@@ -250,6 +151,11 @@ echo "   Function Name: $FUNCTION_NAME"
 echo "   Region: $REGION"
 echo "   ECR Repository: $ECR_REPOSITORY_URI"
 echo "   Image Tag: latest"
+if [[ -n "$LAMBDA_BUCKET_NAME" ]]; then
+    echo "   S3 Bucket: $LAMBDA_BUCKET_NAME"
+fi
 echo ""
-echo "💡 Lambda関数をテストするには:"
+echo "${LOG_PREFIX_INFO} Lambda関数をテストするには:"
+echo "   ./scripts/test-remote.sh"
+echo "   または"
 echo "   aws lambda invoke --function-name $FUNCTION_NAME --region $REGION response.json"
