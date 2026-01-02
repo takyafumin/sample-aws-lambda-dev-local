@@ -12,6 +12,17 @@ dependencies = [
 [dependency-groups]
 dev = [
     "black>=25.12.0",
+    "boto3-stubs[s3]>=1.34.0",
+    "mypy>=1.8.0",
     "pytest>=9.0.2",
     "ruff>=0.14.10",
 ]
+
+[tool.mypy]
+python_version = "3.13"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true

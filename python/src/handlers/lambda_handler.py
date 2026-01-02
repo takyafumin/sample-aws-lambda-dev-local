@@ -1,13 +1,14 @@
 import json
 import boto3
 import os
+from typing import Any, Dict, List
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
 
 
-def getBucketObjectNames():
+def getBucketObjectNames() -> List[str]:
     """S3のバケット内のオブジェクト名を取得する
 
     Returns:
@@ -59,7 +60,7 @@ def getBucketObjectNames():
         return []
 
 
-def lambda_handler(event, context):
+def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """サンプルLambda関数
 
     Args:
@@ -80,5 +81,5 @@ def lambda_handler(event, context):
 
 
 if __name__ == "__main__":
-    event = {}
+    event: Dict[str, Any] = {}
     lambda_handler(event, None)
