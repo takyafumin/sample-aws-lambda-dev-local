@@ -20,8 +20,4 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 COPY src/handlers/lambda_handler.py ${LAMBDA_TASK_ROOT}/src/handlers/
 COPY src/__init__.py ${LAMBDA_TASK_ROOT}/src/
 
-# 環境変数ファイルをコピー（存在する場合のみ）
-# FIXME: .envファイルで認証情報をコンテナにセットするのはよくない
-COPY docker/.env ${LAMBDA_TASK_ROOT}/ 2>/dev/null || echo ".envファイルが見つかりません（オプション）"
-
 CMD ["src.handlers.lambda_handler.lambda_handler"]

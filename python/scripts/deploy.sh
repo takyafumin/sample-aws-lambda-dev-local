@@ -69,7 +69,7 @@ if [[ -n "$DOCKER_PLATFORM" ]]; then
     echo "🏗️ クロスプラットフォームビルド: $DOCKER_PLATFORM"
 fi
 
-docker build $DOCKER_PLATFORM -t $DOCKER_IMAGE_NAME -f docker/Dockerfile .
+docker buildx build $DOCKER_PLATFORM -t $DOCKER_IMAGE_NAME -f docker/Dockerfile . --load
 
 # ECRリポジトリの存在確認・作成
 echo "🗂️ ECRリポジトリを確認しています..."
