@@ -6,7 +6,7 @@ docker/.env
 **/response.json
 
 # Python関連
-__pycache__/
+**/__pycache__/
 *.pyc
 *.pyo
 *.pyd

@@ -1,4 +1,3 @@
-import pytest
 import json
 from unittest.mock import patch, MagicMock
 import sys
@@ -45,9 +44,9 @@ class TestGetBucketObjectNames:
     @patch.dict(
         os.environ,
         {
-            "ACCESS_KEY": "test-access-key",
-            "SECRET_KEY": "test-secret-key",
-            "BUCKET_NAME": "test-bucket",
+            "AWS_ACCESS_KEY_ID": "test-access-key",
+            "AWS_SECRET_ACCESS_KEY": "test-secret-key",
+            "AWS_BUCKET_NAME": "test-bucket",
         },
     )
     @patch("handlers.lambda_handler.boto3.resource")
